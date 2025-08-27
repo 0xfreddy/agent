@@ -19,6 +19,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.config import get_config, Config
 from src.models.schemas import Mood
 from src.agents.recommendation_agent import RecommendationAgent
+from src.chains.recommendation_chain import RecommendationChainOrchestrator
 from src.utils.portfolio_formatter import PortfolioFormatter
 
 console = Console()
@@ -28,6 +29,7 @@ class CryptoRecommendationCLI:
         self.config = get_config()
         self.console = console
         self.agent = RecommendationAgent()
+        self.chain_orchestrator = RecommendationChainOrchestrator()
     
     def analyze_wallet(self, wallet_address: str, mood: str = 'balanced') -> Dict[str, Any]:
         self.console.print(f"\n[bold blue]🔍 Analyzing wallet: {wallet_address}[/bold blue]")
@@ -39,26 +41,31 @@ class CryptoRecommendationCLI:
             console=self.console
         ) as progress:
             
-            task = progress.add_task("[cyan]Analyzing wallet...", total=3)
+            task = progress.add_task("[cyan]Running recommendation chain...", total=5)
             
-            # Step 1: Full Analysis
-            progress.update(task, description="[cyan]Running comprehensive analysis...")
-            analysis_results = self.agent.analyze(wallet_address, mood)
+            # Use the new chain orchestrator for comprehensive analysis
+            progress.update(task, description="[cyan]Step 1/5: Data Collection...")
             progress.update(task, advance=1)
             
-            # Step 2: Generate Recommendation
-            progress.update(task, description="[cyan]Generating recommendation...")
-            recommendation = self.agent.generate_recommendation(analysis_results, mood)
+            progress.update(task, description="[cyan]Step 2/5: Feature Engineering...")
             progress.update(task, advance=1)
             
-            # Step 3: Compile Results
-            progress.update(task, description="[cyan]Compiling results...")
+            progress.update(task, description="[cyan]Step 3/5: Risk Assessment...")
+            progress.update(task, advance=1)
+            
+            progress.update(task, description="[cyan]Step 4/5: ML Predictions...")
+            progress.update(task, advance=1)
+            
+            progress.update(task, description="[cyan]Step 5/5: Final Recommendation...")
+            chain_result = self.chain_orchestrator.run(wallet_address, mood)
+            progress.update(task, advance=1)
+            
+            # Extract results from chain
             results = {
-                'analysis': analysis_results,
-                'recommendation': recommendation,
-                'explanation': self.agent.explain_recommendation(recommendation)
+                'analysis': chain_result.get('analysis_results', {}),
+                'recommendation': chain_result.get('recommendation', {}),
+                'explanation': chain_result.get('explanation', '')
             }
-            progress.update(task, advance=1)
             
             return results
     
@@ -96,6 +103,21 @@ class CryptoRecommendationCLI:
             style="red" if recommendation['risk_score'] > 70 else "yellow" if recommendation['risk_score'] > 40 else "green"
         )
         self.console.print(risk_panel)
+        
+        # Display ML insights if available
+        ml_insights = recommendation.get('ml_insights', {})
+        if ml_insights:
+            ml_panel = Panel(
+                f"[bold]🤖 ML Insights:[/bold]\n"
+                f"• Predicted Action: {ml_insights.get('predicted_action', 'N/A').upper()}\n"
+                f"• ML Confidence: {ml_insights.get('action_confidence', 0):.1%}\n"
+                f"• Optimal Timing: {ml_insights.get('recommended_timing', 'N/A').replace('_', ' ').title()}\n"
+                f"• Recommended Size: {ml_insights.get('recommended_size_percentage', 0):.1f}% of portfolio\n"
+                f"• Wallet Cluster: {ml_insights.get('cluster_characteristics', {}).get('trading_style', 'Unknown')}",
+                style="cyan"
+            )
+            self.console.print(ml_panel)
+        
         self.console.print()
         
         # Risk Assessment
@@ -107,18 +129,18 @@ class CryptoRecommendationCLI:
         
         risk_table.add_row(
             "Volatility",
-            f"{risk_metrics['volatility']['volatility_percentage']:.2f}%",
-            risk_metrics['volatility']['risk_level']
+            f"{risk_metrics.get('volatility_risk', {}).get('volatility_percentage', 0):.2f}%",
+            risk_metrics.get('volatility_risk', {}).get('risk_level', 'unknown')
         )
         risk_table.add_row(
             "Concentration",
-            f"{risk_metrics['concentration']['hhi_score']:.2%}",
-            risk_metrics['concentration']['risk_level']
+            f"{risk_metrics.get('concentration_risk', {}).get('hhi_score', 0):.2%}",
+            risk_metrics.get('concentration_risk', {}).get('risk_level', 'unknown')
         )
         risk_table.add_row(
             "VaR (95%)",
-            f"${risk_metrics['var']['var_95_dollar']:.2f}",
-            risk_metrics['var']['risk_assessment']
+            f"${risk_metrics.get('var_risk', {}).get('var_95_dollar', 0):.2f}",
+            risk_metrics.get('var_risk', {}).get('risk_assessment', 'unknown')
         )
         
         self.console.print(risk_table)

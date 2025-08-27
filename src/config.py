@@ -36,8 +36,8 @@ class Config:
     
     # Transaction API configuration
     octav_transaction_limit: int = 200
-    octav_transaction_offset: int = 100
-    octav_hide_spam: bool = True
+    octav_transaction_offset: int = 0  # Changed from 100 to 0 to get most recent transactions
+    octav_hide_spam: bool = False  # Changed from True to False to include recent transactions
     octav_transaction_sort: str = "DESC"
     octav_transaction_networks: str = ""
     octav_transaction_types: str = ""
@@ -56,8 +56,25 @@ class Config:
     temperature: float = 0.7
     max_tokens: int = 2000
     
-    cluster_min_samples: int = 5
-    cluster_eps: float = 0.3
+    cluster_min_samples: int = 3  # Reduced from 5 to 3 for smaller datasets
+    cluster_eps: float = 1.0  # Increased from 0.3 to 1.0 for more relaxed clustering
+    
+    # Database configuration
+    database_host: str = "localhost"
+    database_port: int = 5432
+    database_name: str = "wallet_clustering"
+    database_user: str = "postgres"
+    database_password: str = ""
+    database_ssl: bool = False
+    
+    # ClickHouse configuration
+    clickhouse_host: str = "cpe8f1p0f9.me-central-1.aws.clickhouse.cloud"
+    clickhouse_port: int = 443
+    clickhouse_database: str = "wallet_clustering"
+    clickhouse_user: str = "default"
+    clickhouse_password: str = "9mmwxpexq8Gl~"
+    clickhouse_secure: bool = True
+    use_clickhouse: bool = True  # Set to True to use ClickHouse instead of PostgreSQL
     
     psi_threshold: float = 0.2
     drift_check_frequency: int = 100
@@ -134,6 +151,23 @@ class Config:
             
             cluster_min_samples=int(os.getenv('CLUSTER_MIN_SAMPLES', '5')),
             cluster_eps=float(os.getenv('CLUSTER_EPS', '0.3')),
+            
+            # Database configuration
+            database_host=os.getenv('DATABASE_HOST', 'localhost'),
+            database_port=int(os.getenv('DATABASE_PORT', '5432')),
+            database_name=os.getenv('DATABASE_NAME', 'wallet_clustering'),
+            database_user=os.getenv('DATABASE_USER', 'postgres'),
+            database_password=os.getenv('DATABASE_PASSWORD', ''),
+            database_ssl=os.getenv('DATABASE_SSL', 'false').lower() == 'true',
+            
+            # ClickHouse configuration
+            clickhouse_host=os.getenv('CLICKHOUSE_HOST', 'cpe8f1p0f9.me-central-1.aws.clickhouse.cloud'),
+            clickhouse_port=int(os.getenv('CLICKHOUSE_PORT', '443')),
+            clickhouse_database=os.getenv('CLICKHOUSE_DATABASE', 'wallet_clustering'),
+            clickhouse_user=os.getenv('CLICKHOUSE_USER', 'default'),
+            clickhouse_password=os.getenv('CLICKHOUSE_PASSWORD', '9mmwxpexq8Gl~'),
+            clickhouse_secure=os.getenv('CLICKHOUSE_SECURE', 'true').lower() == 'true',
+            use_clickhouse=os.getenv('USE_CLICKHOUSE', 'true').lower() == 'true',
             
             psi_threshold=float(os.getenv('PSI_THRESHOLD', '0.2')),
             drift_check_frequency=int(os.getenv('DRIFT_CHECK_FREQUENCY', '100')),
