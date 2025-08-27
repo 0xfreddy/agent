@@ -1,0 +1,307 @@
+#!/usr/bin/env python3
+"""
+Portfolio Data Formatter
+Formats and displays portfolio data in a hierarchical, readable format
+"""
+
+from typing import Dict, Any, List
+from rich.console import Console
+from rich.table import Table
+from rich.panel import Panel
+from rich.text import Text
+from datetime import datetime
+import json
+
+console = Console()
+
+class PortfolioFormatter:
+    """Formats portfolio data for display"""
+    
+    @staticmethod
+    def format_portfolio_data(portfolio_data: Dict[str, Any], wallet_address: str = None) -> None:
+        """
+        Format and display portfolio data in a readable way
+        
+        Args:
+            portfolio_data: Portfolio data dictionary
+            wallet_address: Wallet address being analyzed
+        """
+        if not portfolio_data:
+            console.print("[red]No portfolio data found[/red]")
+            return
+        
+        # Display wallet overview
+        PortfolioFormatter._display_wallet_overview(portfolio_data, wallet_address)
+        
+        # Display portfolio metrics
+        PortfolioFormatter._display_portfolio_metrics(portfolio_data)
+        
+        # Display balances by protocol and chain
+        PortfolioFormatter._display_balances_by_protocol(portfolio_data)
+        
+        # Display top holdings
+        PortfolioFormatter._display_top_holdings(portfolio_data)
+    
+    @staticmethod
+    def _display_wallet_overview(portfolio_data: Dict[str, Any], wallet_address: str = None):
+        """Display wallet overview information"""
+        address = wallet_address or portfolio_data.get('address', 'N/A')
+        
+        overview_panel = Panel(
+            f"[bold cyan]Wallet Portfolio Analysis[/bold cyan]\n"
+            f"[dim]Address: {address}[/dim]\n"
+            f"[dim]Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}[/dim]",
+            style="bold blue"
+        )
+        console.print(overview_panel)
+        console.print()
+    
+    @staticmethod
+    def _display_portfolio_metrics(portfolio_data: Dict[str, Any]):
+        """Display comprehensive portfolio metrics"""
+        metrics_table = Table(title="Portfolio Overview", show_header=True)
+        metrics_table.add_column("Metric", style="cyan", width=20)
+        metrics_table.add_column("Value", style="white", width=25)
+        metrics_table.add_column("Description", style="dim", width=40)
+        
+        # Core metrics
+        total_value = portfolio_data.get('total_value_usd', 0)
+        networth = portfolio_data.get('networth', total_value)
+        cash_balance = portfolio_data.get('cash_balance', 0)
+        open_pnl = portfolio_data.get('open_pnl', 0)
+        closed_pnl = portfolio_data.get('closed_pnl', 0)
+        daily_income = portfolio_data.get('daily_income', 0)
+        daily_expense = portfolio_data.get('daily_expense', 0)
+        fees = portfolio_data.get('fees_fiat', 0)
+        transaction_count = portfolio_data.get('transaction_count', 0)
+        
+        metrics_table.add_row(
+            "Total Value",
+            f"${total_value:,.2f}",
+            "Total portfolio value in USD"
+        )
+        metrics_table.add_row(
+            "Net Worth",
+            f"${networth:,.2f}",
+            "Net worth including PnL"
+        )
+        metrics_table.add_row(
+            "Cash Balance",
+            f"${cash_balance:,.2f}",
+            "Available cash/stables"
+        )
+        metrics_table.add_row(
+            "Open PnL",
+            f"${open_pnl:+,.2f}",
+            "Unrealized profit/loss"
+        )
+        metrics_table.add_row(
+            "Closed PnL",
+            f"${closed_pnl:+,.2f}",
+            "Realized profit/loss"
+        )
+        metrics_table.add_row(
+            "Daily Income",
+            f"${daily_income:+,.2f}",
+            "Daily income from positions"
+        )
+        metrics_table.add_row(
+            "Daily Expense",
+            f"${daily_expense:+,.2f}",
+            "Daily expenses/fees"
+        )
+        metrics_table.add_row(
+            "Total Fees",
+            f"${fees:,.2f}",
+            "Cumulative fees paid"
+        )
+        metrics_table.add_row(
+            "Transactions",
+            f"{transaction_count:,}",
+            "Total transaction count"
+        )
+        
+        console.print(metrics_table)
+        console.print()
+    
+    @staticmethod
+    def _display_balances_by_protocol(portfolio_data: Dict[str, Any]):
+        """Display balances organized by protocol and chain"""
+        balances = portfolio_data.get('balances', {})
+        
+        if not balances:
+            console.print("[yellow]No balance data available[/yellow]")
+            return
+        
+        # Group balances by protocol
+        protocol_groups = {}
+        for asset_key, asset_data in balances.items():
+            if asset_key.startswith('_'):  # Skip special keys
+                continue
+            
+            protocol = asset_data.get('protocol', 'Unknown')
+            chain = asset_data.get('chain', 'Unknown')
+            
+            if protocol not in protocol_groups:
+                protocol_groups[protocol] = {}
+            
+            if chain not in protocol_groups[protocol]:
+                protocol_groups[protocol][chain] = []
+            
+            protocol_groups[protocol][chain].append(asset_data)
+        
+        if not protocol_groups:
+            console.print("[yellow]No protocol data available[/yellow]")
+            return
+        
+        # Display protocol breakdown
+        protocol_table = Table(title="Assets by Protocols", show_header=True)
+        protocol_table.add_column("Protocol", style="cyan", width=20)
+        protocol_table.add_column("Chain", style="blue", width=15)
+        protocol_table.add_column("Assets", style="white", width=30)
+        protocol_table.add_column("Value", style="green", width=15)
+        
+        for protocol_name, chains in protocol_groups.items():
+            protocol_total = 0
+            first_row = True
+            
+            for chain_name, assets in chains.items():
+                chain_total = sum(asset.get('value_usd', 0) for asset in assets)
+                protocol_total += chain_total
+                
+                # Format asset list
+                asset_list = []
+                for asset in assets[:3]:  # Show top 3 assets
+                    symbol = asset.get('symbol', 'Unknown')
+                    value = asset.get('value_usd', 0)
+                    asset_list.append(f"{symbol}: ${value:,.0f}")
+                
+                if len(assets) > 3:
+                    asset_list.append(f"... and {len(assets) - 3} more")
+                
+                asset_text = "\n".join(asset_list)
+                
+                protocol_table.add_row(
+                    protocol_name if first_row else "",
+                    chain_name,
+                    asset_text,
+                    f"${chain_total:,.0f}"
+                )
+                first_row = False
+            
+            # Add protocol total row
+            if len(chains) > 1:
+                protocol_table.add_row(
+                    f"[bold]{protocol_name} Total[/bold]",
+                    "",
+                    "",
+                    f"[bold]${protocol_total:,.0f}[/bold]"
+                )
+        
+        console.print(protocol_table)
+        console.print()
+    
+    @staticmethod
+    def _display_top_holdings(portfolio_data: Dict[str, Any]):
+        """Display top holdings in a table format"""
+        balances = portfolio_data.get('balances', {})
+        
+        if not balances:
+            return
+        
+        # Filter out special keys and sort by value
+        asset_balances = {
+            k: v for k, v in balances.items() 
+            if not k.startswith('_') and v.get('value_usd', 0) > 0
+        }
+        
+        if not asset_balances:
+            return
+        
+        sorted_balances = sorted(
+            asset_balances.items(),
+            key=lambda x: x[1].get('value_usd', 0),
+            reverse=True
+        )[:10]  # Top 10 holdings
+        
+        holdings_table = Table(title="Top Holdings", show_header=True)
+        holdings_table.add_column("Rank", style="cyan", width=5)
+        holdings_table.add_column("Token", style="white", width=15)
+        holdings_table.add_column("Balance", style="white", width=15)
+        holdings_table.add_column("Price", style="yellow", width=12)
+        holdings_table.add_column("Value (USD)", style="green", width=15)
+        holdings_table.add_column("Allocation", style="blue", width=12)
+        holdings_table.add_column("Protocol", style="dim", width=15)
+        
+        total_value = sum(b.get('value_usd', 0) for b in asset_balances.values())
+        
+        for rank, (asset_key, asset_data) in enumerate(sorted_balances, 1):
+            symbol = asset_data.get('symbol', 'Unknown')
+            balance = asset_data.get('balance', 0)
+            price = asset_data.get('price_usd', 0)
+            value = asset_data.get('value_usd', 0)
+            allocation = (value / total_value * 100) if total_value > 0 else 0
+            protocol = asset_data.get('protocol', 'Unknown')
+            
+            holdings_table.add_row(
+                str(rank),
+                symbol,
+                f"{balance:.4f}",
+                f"${price:,.2f}",
+                f"${value:,.2f}",
+                f"{allocation:.1f}%",
+                protocol
+            )
+        
+        console.print(holdings_table)
+        console.print()
+    
+    @staticmethod
+    def format_for_export(portfolio_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Format portfolio data for export (JSON/CSV)
+        
+        Args:
+            portfolio_data: Raw portfolio data
+            
+        Returns:
+            Formatted data suitable for export
+        """
+        formatted_data = {
+            'wallet_info': {
+                'address': portfolio_data.get('address', 'N/A'),
+                'analysis_timestamp': datetime.now().isoformat(),
+                'total_value_usd': portfolio_data.get('total_value_usd', 0),
+                'transaction_count': portfolio_data.get('transaction_count', 0)
+            },
+            'portfolio_metrics': {
+                'networth': portfolio_data.get('networth', 0),
+                'cash_balance': portfolio_data.get('cash_balance', 0),
+                'open_pnl': portfolio_data.get('open_pnl', 0),
+                'closed_pnl': portfolio_data.get('closed_pnl', 0),
+                'daily_income': portfolio_data.get('daily_income', 0),
+                'daily_expense': portfolio_data.get('daily_expense', 0),
+                'fees_fiat': portfolio_data.get('fees_fiat', 0),
+                'last_updated': portfolio_data.get('last_updated', 'N/A')
+            },
+            'holdings': []
+        }
+        
+        # Format holdings
+        balances = portfolio_data.get('balances', {})
+        for asset_key, asset_data in balances.items():
+            if not asset_key.startswith('_'):
+                formatted_data['holdings'].append({
+                    'symbol': asset_data.get('symbol', 'Unknown'),
+                    'name': asset_data.get('name', asset_data.get('symbol', 'Unknown')),
+                    'address': asset_data.get('address', ''),
+                    'balance': asset_data.get('balance', 0),
+                    'price_usd': asset_data.get('price_usd', 0),
+                    'value_usd': asset_data.get('value_usd', 0),
+                    'allocation_percentage': asset_data.get('allocation_percentage', 0),
+                    'protocol': asset_data.get('protocol', 'Unknown'),
+                    'chain': asset_data.get('chain', 'Unknown'),
+                    'position': asset_data.get('position', 'Unknown')
+                })
+        
+        return formatted_data
