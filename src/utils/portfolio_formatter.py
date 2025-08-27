@@ -305,3 +305,129 @@ class PortfolioFormatter:
                 })
         
         return formatted_data
+    
+    @staticmethod
+    def format_transactions(transactions: List[Dict], max_display: int = 10) -> None:
+        """Format and display transaction data"""
+        if not transactions:
+            console.print("[yellow]No transactions found[/yellow]")
+            return
+        
+        console.print(f"\n[bold blue]📊 TRANSACTIONS ({len(transactions)} total)[/bold blue]")
+        console.print("=" * 80)
+        
+        # Display transaction summary
+        tx_types = {}
+        chains = {}
+        protocols = {}
+        total_value = 0
+        total_fees = 0
+        
+        for tx in transactions:
+            tx_type = tx.get('type', 'UNKNOWN')
+            tx_types[tx_type] = tx_types.get(tx_type, 0) + 1
+            
+            chain_name = tx.get('chain', {}).get('name', 'Unknown')
+            chains[chain_name] = chains.get(chain_name, 0) + 1
+            
+            protocol_name = tx.get('protocol', {}).get('name', 'Unknown')
+            protocols[protocol_name] = protocols.get(protocol_name, 0) + 1
+            
+            total_value += tx.get('value_fiat', 0)
+            total_fees += tx.get('fees_fiat', 0)
+        
+        # Create summary table
+        summary_table = Table(title="Transaction Summary", show_header=True, header_style="bold magenta")
+        summary_table.add_column("Metric", style="cyan")
+        summary_table.add_column("Value", style="green")
+        
+        summary_table.add_row("Total Transactions", str(len(transactions)))
+        summary_table.add_row("Total Value", f"${total_value:,.2f}")
+        summary_table.add_row("Total Fees", f"${total_fees:,.2f}")
+        summary_table.add_row("Avg Value per TX", f"${total_value/len(transactions):,.2f}" if transactions else "$0.00")
+        
+        console.print(summary_table)
+        console.print()
+        
+        # Display transaction types breakdown
+        if tx_types:
+            type_table = Table(title="Transaction Types", show_header=True, header_style="bold magenta")
+            type_table.add_column("Type", style="cyan")
+            type_table.add_column("Count", style="green")
+            type_table.add_column("Percentage", style="yellow")
+            
+            for tx_type, count in sorted(tx_types.items(), key=lambda x: x[1], reverse=True):
+                percentage = (count / len(transactions)) * 100
+                type_table.add_row(tx_type, str(count), f"{percentage:.1f}%")
+            
+            console.print(type_table)
+            console.print()
+        
+        # Display recent transactions
+        recent_txs = transactions[:max_display]
+        if recent_txs:
+            tx_table = Table(title=f"Recent Transactions (showing {len(recent_txs)})", show_header=True, header_style="bold magenta")
+            tx_table.add_column("Date", style="cyan")
+            tx_table.add_column("Type", style="green")
+            tx_table.add_column("Chain", style="yellow")
+            tx_table.add_column("Protocol", style="blue")
+            tx_table.add_column("Value", style="red")
+            tx_table.add_column("Fees", style="magenta")
+            
+            for tx in recent_txs:
+                timestamp = tx.get('timestamp', datetime.now())
+                if isinstance(timestamp, datetime):
+                    date_str = timestamp.strftime("%Y-%m-%d %H:%M")
+                else:
+                    date_str = str(timestamp)
+                
+                tx_type = tx.get('type', 'UNKNOWN')
+                chain = tx.get('chain', {}).get('name', 'Unknown')
+                protocol = tx.get('protocol', {}).get('name', 'Unknown')
+                value = f"${tx.get('value_fiat', 0):,.2f}"
+                fees = f"${tx.get('fees_fiat', 0):,.2f}"
+                
+                tx_table.add_row(date_str, tx_type, chain, protocol, value, fees)
+            
+            console.print(tx_table)
+            console.print()
+        
+        # Display asset flow summary
+        asset_inflows = {}
+        asset_outflows = {}
+        
+        for tx in transactions:
+            # Track assets received
+            for asset in tx.get('assets_in', []):
+                symbol = asset.get('symbol', 'Unknown')
+                value = asset.get('value', 0)
+                asset_inflows[symbol] = asset_inflows.get(symbol, 0) + value
+            
+            # Track assets sent
+            for asset in tx.get('assets_out', []):
+                symbol = asset.get('symbol', 'Unknown')
+                value = asset.get('value', 0)
+                asset_outflows[symbol] = asset_outflows.get(symbol, 0) + value
+        
+        if asset_inflows or asset_outflows:
+            asset_table = Table(title="Asset Flow Summary", show_header=True, header_style="bold magenta")
+            asset_table.add_column("Asset", style="cyan")
+            asset_table.add_column("Inflow", style="green")
+            asset_table.add_column("Outflow", style="red")
+            asset_table.add_column("Net Flow", style="yellow")
+            
+            all_assets = set(asset_inflows.keys()) | set(asset_outflows.keys())
+            
+            for asset in sorted(all_assets):
+                inflow = asset_inflows.get(asset, 0)
+                outflow = asset_outflows.get(asset, 0)
+                net_flow = inflow - outflow
+                
+                inflow_str = f"${inflow:,.2f}" if inflow > 0 else "-"
+                outflow_str = f"${outflow:,.2f}" if outflow > 0 else "-"
+                net_flow_str = f"${net_flow:,.2f}"
+                
+                asset_table.add_row(asset, inflow_str, outflow_str, net_flow_str)
+            
+            console.print(asset_table)
+            console.print()

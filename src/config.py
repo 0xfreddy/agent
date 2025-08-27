@@ -33,6 +33,15 @@ class Config:
     octav_include_explorer_urls: bool = False
     octav_wait_for_sync: bool = False
     
+    # Transaction API configuration
+    octav_transaction_limit: int = 100
+    octav_transaction_offset: int = 0
+    octav_hide_spam: bool = True
+    octav_transaction_sort: str = "DESC"
+    octav_transaction_networks: str = ""
+    octav_transaction_types: str = ""
+    octav_transaction_protocols: str = ""
+    
     model_name: str = "gpt-4-turbo-preview"
     temperature: float = 0.7
     max_tokens: int = 2000
@@ -98,6 +107,15 @@ class Config:
             octav_include_images=os.getenv('OCTAV_INCLUDE_IMAGES', 'false').lower() == 'true',
             octav_include_explorer_urls=os.getenv('OCTAV_INCLUDE_EXPLORER_URLS', 'false').lower() == 'true',
             octav_wait_for_sync=os.getenv('OCTAV_WAIT_FOR_SYNC', 'false').lower() == 'true',
+            
+            # Transaction API configuration
+            octav_transaction_limit=int(os.getenv('OCTAV_TRANSACTION_LIMIT', '100')),
+            octav_transaction_offset=int(os.getenv('OCTAV_TRANSACTION_OFFSET', '0')),
+            octav_hide_spam=os.getenv('OCTAV_HIDE_SPAM', 'true').lower() == 'true',
+            octav_transaction_sort=os.getenv('OCTAV_TRANSACTION_SORT', 'DESC'),
+            octav_transaction_networks=os.getenv('OCTAV_TRANSACTION_NETWORKS', ''),
+            octav_transaction_types=os.getenv('OCTAV_TRANSACTION_TYPES', ''),
+            octav_transaction_protocols=os.getenv('OCTAV_TRANSACTION_PROTOCOLS', ''),
             
             model_name=os.getenv('MODEL_NAME', 'gpt-4-turbo-preview'),
             temperature=float(os.getenv('TEMPERATURE', '0.7')),

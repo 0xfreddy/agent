@@ -99,19 +99,36 @@ class OctavDataTool(BaseDataTool):
             portfolio_response.raise_for_status()
             portfolio_data = portfolio_response.json()
             
-            # Get wallet data from proxy server (for transaction history)
-            self.logger.info(f"Fetching wallet data for {wallet_address}")
-            wallet_response = requests.get(
-                f"http://localhost:3001/api/wallet",
+            # Get transaction data from proxy server using the new /v1/transactions endpoint
+            self.logger.info(f"Fetching transaction data for {wallet_address}")
+            transaction_params = {
+                "addresses": wallet_address,
+                "limit": str(self.config.octav_transaction_limit),
+                "offset": str(self.config.octav_transaction_offset),
+                "sort": self.config.octav_transaction_sort
+            }
+            
+            # Add optional transaction filters
+            if self.config.octav_hide_spam:
+                transaction_params["hideSpam"] = "true"
+            if self.config.octav_transaction_networks:
+                transaction_params["networks"] = self.config.octav_transaction_networks
+            if self.config.octav_transaction_types:
+                transaction_params["txTypes"] = self.config.octav_transaction_types
+            if self.config.octav_transaction_protocols:
+                transaction_params["protocols"] = self.config.octav_transaction_protocols
+            
+            transaction_response = requests.get(
+                f"http://localhost:3001/api/transactions",
                 headers=headers,
-                params={"addresses": wallet_address},
+                params=transaction_params,
                 timeout=self.config.request_timeout
             )
-            wallet_response.raise_for_status()
-            wallet_data = wallet_response.json()
+            transaction_response.raise_for_status()
+            transaction_data = transaction_response.json()
             
             # Parse the Octav API response structure
-            transactions = self._parse_octav_transactions(wallet_data)
+            transactions = self._parse_octav_transactions_new(transaction_data)
             balances = self._parse_octav_portfolio(portfolio_data)
             
             # Extract portfolio metrics if available
@@ -174,7 +191,7 @@ class OctavDataTool(BaseDataTool):
             raise ValueError(f"An unexpected error occurred: {str(e)}")
     
     def _parse_octav_transactions(self, wallet_data: Dict) -> List[Dict]:
-        """Parse transaction data from Octav /v1/wallet response"""
+        """Parse transaction data from Octav /v1/wallet response (legacy)"""
         transactions = []
         
         try:
@@ -199,6 +216,116 @@ class OctavDataTool(BaseDataTool):
                         })
                     except Exception as e:
                         self.logger.warning(f"Failed to parse transaction: {e}")
+        except Exception as e:
+            self.logger.error(f"Error parsing Octav transactions: {e}")
+        
+        return transactions
+    
+    def _parse_octav_transactions_new(self, transaction_data: Dict) -> List[Dict]:
+        """Parse transaction data from Octav /v1/transactions response (new comprehensive endpoint)"""
+        transactions = []
+        
+        try:
+            # Extract transactions from the response
+            tx_list = transaction_data.get('transactions', [])
+            
+            for tx in tx_list:
+                try:
+                    # Parse timestamp
+                    timestamp_str = tx.get('timestamp', '')
+                    if timestamp_str:
+                        try:
+                            timestamp = datetime.fromtimestamp(int(timestamp_str))
+                        except (ValueError, TypeError):
+                            timestamp = datetime.now()
+                    else:
+                        timestamp = datetime.now()
+                    
+                    # Parse chain information
+                    chain_info = tx.get('chain', {})
+                    chain_name = chain_info.get('name', 'Unknown')
+                    chain_key = chain_info.get('key', 'unknown')
+                    
+                    # Parse protocol information
+                    protocol_info = tx.get('protocol', {})
+                    protocol_name = protocol_info.get('name', 'Unknown')
+                    protocol_key = protocol_info.get('key', 'unknown')
+                    
+                    # Parse sub-protocol information
+                    sub_protocol_info = tx.get('subProtocol', {})
+                    sub_protocol_name = sub_protocol_info.get('name', '')
+                    sub_protocol_key = sub_protocol_info.get('key', '')
+                    
+                    # Parse assets
+                    assets_in = []
+                    assets_out = []
+                    
+                    for asset in tx.get('assetsIn', []):
+                        assets_in.append({
+                            'symbol': asset.get('symbol', ''),
+                            'name': asset.get('name', ''),
+                            'balance': float(asset.get('balance', 0)),
+                            'value': float(asset.get('value', 0)),
+                            'price': float(asset.get('price', 0)),
+                            'contract': asset.get('contract', ''),
+                            'decimal': int(asset.get('decimal', 18))
+                        })
+                    
+                    for asset in tx.get('assetsOut', []):
+                        assets_out.append({
+                            'symbol': asset.get('symbol', ''),
+                            'name': asset.get('name', ''),
+                            'balance': float(asset.get('balance', 0)),
+                            'value': float(asset.get('value', 0)),
+                            'price': float(asset.get('price', 0)),
+                            'contract': asset.get('contract', ''),
+                            'decimal': int(asset.get('decimal', 18))
+                        })
+                    
+                    # Parse native asset fees
+                    native_fees = tx.get('nativeAssetFees', {})
+                    native_fee_amount = float(native_fees.get('amount', 0))
+                    native_fee_value = float(native_fees.get('value', 0))
+                    
+                    # Create transaction object
+                    transaction = {
+                        'hash': tx.get('hash', ''),
+                        'type': tx.get('type', 'UNKNOWN'),
+                        'chain': {
+                            'name': chain_name,
+                            'key': chain_key
+                        },
+                        'protocol': {
+                            'name': protocol_name,
+                            'key': protocol_key
+                        },
+                        'sub_protocol': {
+                            'name': sub_protocol_name,
+                            'key': sub_protocol_key
+                        },
+                        'from': tx.get('from', ''),
+                        'to': tx.get('to', ''),
+                        'value': float(tx.get('value', 0)),
+                        'value_fiat': float(tx.get('valueFiat', 0)),
+                        'fees': float(tx.get('fees', 0)),
+                        'fees_fiat': float(tx.get('feesFiat', 0)),
+                        'timestamp': timestamp,
+                        'function_name': tx.get('functionName', ''),
+                        'closed_pnl': tx.get('closedPnl', 'N/A'),
+                        'assets_in': assets_in,
+                        'assets_out': assets_out,
+                        'native_fees': {
+                            'amount': native_fee_amount,
+                            'value': native_fee_value
+                        }
+                    }
+                    
+                    transactions.append(transaction)
+                    
+                except Exception as e:
+                    self.logger.warning(f"Failed to parse transaction {tx.get('hash', 'unknown')}: {e}")
+                    continue
+                    
         except Exception as e:
             self.logger.error(f"Error parsing Octav transactions: {e}")
         

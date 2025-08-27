@@ -84,7 +84,7 @@ app.get('/api/portfolio', async (req, res) => {
     }
 });
 
-// Wallet endpoint - uses /v1/wallet for transaction history
+// Wallet endpoint - uses /v1/wallet for transaction history (legacy)
 app.get('/api/wallet', async (req, res) => {
     try {
         const { addresses } = req.query;
@@ -103,6 +103,55 @@ app.get('/api/wallet', async (req, res) => {
         console.error('Wallet proxy error:', error.message);
         res.status(500).json({ 
             error: 'Failed to fetch wallet data',
+            details: error.response?.data || error.message
+        });
+    }
+});
+
+// Transactions endpoint - uses /v1/transactions for comprehensive transaction data
+app.get('/api/transactions', async (req, res) => {
+    try {
+        const { addresses } = req.query;
+        
+        if (!addresses) {
+            return res.status(400).json({ error: 'addresses parameter is required' });
+        }
+        
+        // Build parameters for the transactions endpoint
+        const params = {
+            addresses: addresses
+        };
+        
+        // Add optional parameters
+        const optionalParams = [
+            'limit', 'offset', 'initialSearchText', 'interactingAddresses',
+            'networks', 'txTypes', 'protocols', 'hideSpam', 'sort',
+            'tokenId', 'startDate', 'endDate'
+        ];
+        
+        optionalParams.forEach(param => {
+            if (req.query[param]) {
+                params[param] = req.query[param];
+            }
+        });
+        
+        // Set default limit if not provided
+        if (!params.limit) {
+            params.limit = '100';
+        }
+        
+        // Set default sort if not provided
+        if (!params.sort) {
+            params.sort = 'DESC';
+        }
+        
+        const transactionData = await makeOctavRequest('/v1/transactions', params, 'GET');
+        
+        res.json(transactionData);
+    } catch (error) {
+        console.error('Transactions proxy error:', error.message);
+        res.status(500).json({ 
+            error: 'Failed to fetch transaction data',
             details: error.response?.data || error.message
         });
     }

@@ -82,6 +82,10 @@ class CryptoRecommendationCLI:
         # Use the new portfolio formatter for comprehensive display
         PortfolioFormatter.format_portfolio_data(wallet_data, wallet_data['address'])
         
+        # Display transaction data if available
+        if 'transactions' in wallet_data and wallet_data['transactions']:
+            PortfolioFormatter.format_transactions(wallet_data['transactions'])
+        
         # Add risk score to the display
         risk_panel = Panel(
             f"[bold]Risk Assessment Score: {recommendation['risk_score']:.1f}/100[/bold]",
@@ -184,8 +188,18 @@ def cli():
 @click.option('--include-images', is_flag=True, help='Include image URLs in portfolio data')
 @click.option('--include-explorer-urls', is_flag=True, help='Include explorer links in portfolio data')
 @click.option('--wait-for-sync', is_flag=True, help='Wait for fresh data (may take longer)')
+@click.option('--tx-limit', default=100, help='Number of transactions to fetch (1-250)')
+@click.option('--tx-offset', default=0, help='Transaction pagination offset')
+@click.option('--tx-sort', default='DESC', type=click.Choice(['DESC', 'ASC']), help='Transaction sort order')
+@click.option('--tx-networks', help='Comma-separated list of networks to filter (e.g., ethereum,arbitrum)')
+@click.option('--tx-types', help='Comma-separated list of transaction types (e.g., SWAP,DEPOSIT)')
+@click.option('--tx-protocols', help='Comma-separated list of protocols to filter (e.g., uniswap,aave)')
+@click.option('--hide-spam', is_flag=True, default=True, help='Hide spam transactions')
+@click.option('--show-spam', is_flag=True, help='Show spam transactions (overrides --hide-spam)')
 def analyze(wallet_address: str, mood: str, export: Optional[str], output: str, 
-           include_nfts: bool, include_images: bool, include_explorer_urls: bool, wait_for_sync: bool):
+           include_nfts: bool, include_images: bool, include_explorer_urls: bool, wait_for_sync: bool,
+           tx_limit: int, tx_offset: int, tx_sort: str, tx_networks: Optional[str], 
+           tx_types: Optional[str], tx_protocols: Optional[str], hide_spam: bool, show_spam: bool):
     """Analyze a wallet and generate recommendations"""
     
     cli_app = CryptoRecommendationCLI()
@@ -196,6 +210,24 @@ def analyze(wallet_address: str, mood: str, export: Optional[str], output: str,
         cli_app.config.octav_include_images = include_images
         cli_app.config.octav_include_explorer_urls = include_explorer_urls
         cli_app.config.octav_wait_for_sync = wait_for_sync
+    
+    # Update transaction configuration with CLI parameters
+    cli_app.config.octav_transaction_limit = tx_limit
+    cli_app.config.octav_transaction_offset = tx_offset
+    cli_app.config.octav_transaction_sort = tx_sort
+    
+    if tx_networks:
+        cli_app.config.octav_transaction_networks = tx_networks
+    if tx_types:
+        cli_app.config.octav_transaction_types = tx_types
+    if tx_protocols:
+        cli_app.config.octav_transaction_protocols = tx_protocols
+    
+    # Handle spam filtering
+    if show_spam:
+        cli_app.config.octav_hide_spam = False
+    else:
+        cli_app.config.octav_hide_spam = hide_spam
     
     try:
         results = cli_app.analyze_wallet(wallet_address, mood)
