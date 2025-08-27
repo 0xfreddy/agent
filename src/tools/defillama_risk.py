@@ -68,6 +68,44 @@ class DefiLlamaRiskAnalyzer:
         
         logger.info("DefiLlamaRiskAnalyzer initialized")
     
+    def _map_protocol_name(self, protocol_name: str) -> str:
+        """
+        Map protocol names to DefiLlama format.
+        
+        Args:
+            protocol_name: Original protocol name
+            
+        Returns:
+            Mapped protocol name for DefiLlama API
+        """
+        # Protocol name mapping for DefiLlama
+        protocol_mapping = {
+            'ethereum name service': 'ens',
+            'across v2': 'across',
+            'gaslite': 'gaslite',
+            'circle cctp': 'circle',
+            'cow swap': 'cowswap',
+            'zerion': 'zerion',
+            'anime': 'anime',
+            'blur': 'blur',
+            'metamask': 'metamask',
+            'opensea': 'opensea',
+            'uniswap': 'uniswap',
+            'aave': 'aave',
+            'compound': 'compound',
+            'camelot': 'camelot',
+            'symbiosis': 'symbiosis',
+            'li.fi': 'lifi',
+            'extra finance': 'extra-finance',
+            'cbridge': 'cbridge'
+        }
+        
+        # Clean the protocol name
+        clean_name = protocol_name.lower().strip()
+        
+        # Return mapped name or original if not found
+        return protocol_mapping.get(clean_name, clean_name)
+    
     def get_protocol_tvl(self, protocol_name: str) -> Dict[str, Any]:
         """
         Get protocol TVL data and health metrics.
@@ -79,7 +117,10 @@ class DefiLlamaRiskAnalyzer:
             Dict containing TVL data, trends, and health metrics
         """
         try:
-            url = f"{self.base_url}/protocol/{protocol_name}"
+            # Map protocol name and URL encode it
+            mapped_name = self._map_protocol_name(protocol_name)
+            encoded_name = requests.utils.quote(mapped_name)
+            url = f"{self.base_url}/protocol/{encoded_name}"
             response = self.session.get(url, timeout=self.timeout)
             response.raise_for_status()
             
@@ -118,7 +159,12 @@ class DefiLlamaRiskAnalyzer:
                 'error': str(e),
                 'current_tvl': 0,
                 'week_change_pct': 0,
-                'month_change_pct': 0
+                'month_change_pct': 0,
+                'tvl_data': [],
+                'chain_tvls': {},
+                'tokens_in_usd': [],
+                'tokens': [],
+                'last_updated': 0
             }
     
     def get_hack_history(self, days_back: int = 365) -> List[Dict[str, Any]]:
@@ -165,7 +211,8 @@ class DefiLlamaRiskAnalyzer:
             List of yield pools with APY and risk metrics
         """
         try:
-            url = f"{self.base_url}/pools"
+            # Use the correct endpoint for yields (v2)
+            url = f"{self.base_url}/v2/yields"
             response = self.session.get(url, timeout=self.timeout)
             response.raise_for_status()
             
@@ -356,11 +403,18 @@ class DefiLlamaRiskAnalyzer:
         protocol_risks = {}
         total_risk_score = 0
         
-        for protocol in wallet_protocols:
+        # Limit to top 10 protocols to avoid API rate limits
+        limited_protocols = wallet_protocols[:10]
+        
+        for protocol in limited_protocols:
             try:
                 risk_data = self.calculate_protocol_risk_score(protocol)
                 protocol_risks[protocol] = risk_data
                 total_risk_score += risk_data['total_risk_score']
+                
+                # Add small delay to avoid overwhelming the API
+                time.sleep(0.1)
+                
             except Exception as e:
                 logger.error(f"Failed to analyze protocol {protocol}: {e}")
                 protocol_risks[protocol] = {
