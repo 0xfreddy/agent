@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 import logging
 from src.config import get_config
 from src.models.schemas import WalletData, TransactionHistory, TokenBalance, MarketData, ProtocolData
+from src.tools.defillama_risk import DefiLlamaRiskAnalyzer
 
 class BaseDataTool:
     
@@ -27,6 +28,9 @@ class BaseDataTool:
             self.logger.warning("Redis not available, caching disabled")
             self.cache_enabled = False
             self.redis_client = None
+        
+        # Initialize DefiLlama risk analyzer
+        self.defillama_analyzer = DefiLlamaRiskAnalyzer(self.config)
     
     def _cache_key(self, prefix: str, params: Dict) -> str:
         params_str = json.dumps(params, sort_keys=True)
@@ -165,6 +169,12 @@ class OctavDataTool(BaseDataTool):
             # Extract portfolio metrics if available
             portfolio_metrics = balances.pop('_portfolio_metrics', {})
             
+            # Extract protocols used by the wallet
+            wallet_protocols = self._extract_wallet_protocols(portfolio_data, transactions)
+            
+            # Get DefiLlama risk analysis for protocols
+            protocol_risk_analysis = self._get_protocol_risk_analysis(wallet_protocols)
+            
             wallet_data = {
                 'address': wallet_address.lower(),
                 'transactions': transactions,
@@ -181,7 +191,10 @@ class OctavDataTool(BaseDataTool):
                 'daily_income': portfolio_metrics.get('daily_income', 0),
                 'daily_expense': portfolio_metrics.get('daily_expense', 0),
                 'fees_fiat': portfolio_metrics.get('fees_fiat', 0),
-                'last_updated': portfolio_metrics.get('last_updated', 'N/A')
+                'last_updated': portfolio_metrics.get('last_updated', 'N/A'),
+                # Add DefiLlama risk analysis
+                'protocols_used': wallet_protocols,
+                'protocol_risk_analysis': protocol_risk_analysis
             }
             
             self._set_cached(cache_key, wallet_data)
@@ -505,6 +518,83 @@ class OctavDataTool(BaseDataTool):
             self.logger.error(f"Error parsing flat portfolio structure: {e}")
         
         return balances
+    
+    def _extract_wallet_protocols(self, portfolio_data: Dict, transactions: List[Dict]) -> List[str]:
+        """Extract unique protocols used by the wallet from portfolio and transaction data"""
+        protocols = set()
+        
+        try:
+            # Extract from portfolio data (hierarchical structure)
+            if isinstance(portfolio_data, dict):
+                # Check for chains and their protocols
+                chains = portfolio_data.get('chains', {})
+                for chain_name, chain_data in chains.items():
+                    if isinstance(chain_data, dict):
+                        protocols_data = chain_data.get('protocols', {})
+                        for protocol_name, protocol_data in protocols_data.items():
+                            if protocol_name and protocol_name.lower() not in ['wallet', 'unknown']:
+                                protocols.add(protocol_name.lower())
+            
+            # Extract from transactions
+            for tx in transactions:
+                # Handle different protocol field structures
+                protocol = tx.get('protocol', '')
+                if isinstance(protocol, dict):
+                    protocol = protocol.get('name', '')
+                elif isinstance(protocol, str):
+                    protocol = protocol
+                else:
+                    protocol = ''
+                
+                if protocol and protocol.lower() not in ['wallet', 'unknown']:
+                    protocols.add(protocol.lower())
+            
+            # Clean up protocol names
+            cleaned_protocols = []
+            for protocol in protocols:
+                # Map common variations to standard names
+                if protocol in ['uniswap v3', 'uniswap-v3', 'uniswap_v3']:
+                    cleaned_protocols.append('uniswap')
+                elif protocol in ['aave v3', 'aave-v3', 'aave_v3']:
+                    cleaned_protocols.append('aave')
+                elif protocol in ['compound v3', 'compound-v3', 'compound_v3']:
+                    cleaned_protocols.append('compound')
+                else:
+                    cleaned_protocols.append(protocol)
+            
+            return list(set(cleaned_protocols))  # Remove duplicates
+            
+        except Exception as e:
+            self.logger.error(f"Error extracting wallet protocols: {e}")
+            return []
+    
+    def _get_protocol_risk_analysis(self, wallet_protocols: List[str]) -> Dict[str, Any]:
+        """Get DefiLlama risk analysis for all protocols used by the wallet"""
+        try:
+            if not wallet_protocols:
+                return {
+                    'wallet_protocol_risk': 0.0,
+                    'risk_level': 'low',
+                    'protocol_risks': {},
+                    'high_risk_protocols': [],
+                    'recommendations': ['No protocols detected for risk analysis']
+                }
+            
+            # Use DefiLlama analyzer to get comprehensive risk assessment
+            risk_analysis = self.defillama_analyzer.analyze_wallet_protocols(wallet_protocols)
+            
+            self.logger.info(f"Risk analysis completed for {len(wallet_protocols)} protocols")
+            return risk_analysis
+            
+        except Exception as e:
+            self.logger.error(f"Error getting protocol risk analysis: {e}")
+            return {
+                'wallet_protocol_risk': 0.5,  # Default medium risk
+                'risk_level': 'medium',
+                'protocol_risks': {},
+                'high_risk_protocols': [],
+                'recommendations': [f'Risk analysis failed: {str(e)}']
+            }
     
     def _get_mock_wallet_data(self, wallet_address: str) -> Dict:
         return {

@@ -307,6 +307,90 @@ class PortfolioFormatter:
         return formatted_data
     
     @staticmethod
+    def format_protocol_risk_analysis(risk_analysis: Dict[str, Any]) -> None:
+        """Format and display DefiLlama protocol risk analysis"""
+        if not risk_analysis:
+            console.print("[yellow]No protocol risk analysis available[/yellow]")
+            return
+        
+        console.print(f"\n[bold red]🔴 PROTOCOL RISK ANALYSIS[/bold red]")
+        console.print("=" * 80)
+        
+        # Display overall wallet protocol risk
+        wallet_risk = risk_analysis.get('wallet_protocol_risk', 0)
+        risk_level = risk_analysis.get('risk_level', 'unknown')
+        
+        risk_color = "red" if risk_level == "high" else "yellow" if risk_level == "medium" else "green"
+        
+        overall_risk_panel = Panel(
+            f"[bold]Overall Protocol Risk: {wallet_risk:.1%}[/bold]\n"
+            f"[bold]Risk Level: {risk_level.upper()}[/bold]",
+            style=risk_color
+        )
+        console.print(overall_risk_panel)
+        console.print()
+        
+        # Display high-risk protocols
+        high_risk_protocols = risk_analysis.get('high_risk_protocols', [])
+        if high_risk_protocols:
+            high_risk_table = Table(title="🚨 High-Risk Protocols", show_header=True, header_style="bold red")
+            high_risk_table.add_column("Protocol", style="red")
+            high_risk_table.add_column("Risk Level", style="red")
+            high_risk_table.add_column("Recommendation", style="yellow")
+            
+            for protocol in high_risk_protocols:
+                protocol_data = risk_analysis.get('protocol_risks', {}).get(protocol, {})
+                risk_level = protocol_data.get('risk_level', 'high')
+                recommendations = protocol_data.get('recommendations', ['Consider exiting position'])
+                
+                high_risk_table.add_row(
+                    protocol.upper(),
+                    risk_level.upper(),
+                    recommendations[0] if recommendations else "Consider exiting position"
+                )
+            
+            console.print(high_risk_table)
+            console.print()
+        
+        # Display detailed protocol risks
+        protocol_risks = risk_analysis.get('protocol_risks', {})
+        if protocol_risks:
+            protocol_table = Table(title="Protocol Risk Breakdown", show_header=True, header_style="bold magenta")
+            protocol_table.add_column("Protocol", style="cyan")
+            protocol_table.add_column("Risk Score", style="white")
+            protocol_table.add_column("Risk Level", style="white")
+            protocol_table.add_column("TVL Risk", style="yellow")
+            protocol_table.add_column("Hack Risk", style="red")
+            protocol_table.add_column("Yield Risk", style="blue")
+            
+            for protocol, data in protocol_risks.items():
+                risk_factors = data.get('risk_factors', {})
+                
+                protocol_table.add_row(
+                    protocol.upper(),
+                    f"{data.get('total_risk_score', 0):.1%}",
+                    data.get('risk_level', 'unknown').upper(),
+                    f"{risk_factors.get('tvl_risk', 0):.1%}",
+                    f"{risk_factors.get('hack_risk', 0):.1%}",
+                    f"{risk_factors.get('yield_risk', 0):.1%}"
+                )
+            
+            console.print(protocol_table)
+            console.print()
+        
+        # Display recommendations
+        recommendations = risk_analysis.get('recommendations', [])
+        if recommendations:
+            rec_table = Table(title="Risk Recommendations", show_header=True, header_style="bold green")
+            rec_table.add_column("Recommendation", style="green")
+            
+            for rec in recommendations:
+                rec_table.add_row(rec)
+            
+            console.print(rec_table)
+            console.print()
+    
+    @staticmethod
     def format_transactions(transactions: List[Dict], max_display: int = 10) -> None:
         """Format and display transaction data"""
         if not transactions:

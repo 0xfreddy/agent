@@ -16,6 +16,7 @@ class Config:
     langchain_api_key: str
     openai_api_key: str
     octav_api_key: str
+    defillama_api_key: Optional[str] = None
     nansen_api_key: Optional[str] = None
     redis_url: str = "redis://localhost:6379"
     
@@ -34,13 +35,22 @@ class Config:
     octav_wait_for_sync: bool = False
     
     # Transaction API configuration
-    octav_transaction_limit: int = 100
+    octav_transaction_limit: int = 200
     octav_transaction_offset: int = 100
     octav_hide_spam: bool = True
     octav_transaction_sort: str = "DESC"
     octav_transaction_networks: str = ""
     octav_transaction_types: str = ""
     octav_transaction_protocols: str = ""
+    
+    # DefiLlama API configuration
+    defillama_base_url: str = "https://api.llama.fi"
+    defillama_timeout: int = 30
+    defillama_cache_ttl: int = 3600  # 1 hour cache for most data
+    defillama_hack_cache_ttl: int = 21600  # 6 hours for hack data
+    defillama_tvl_cache_ttl: int = 1800  # 30 minutes for TVL data
+    defillama_yield_cache_ttl: int = 14400  # 4 hours for yield data
+    defillama_stablecoin_cache_ttl: int = 1800  # 30 minutes for stablecoin data
     
     model_name: str = "gpt-4-turbo-preview"
     temperature: float = 0.7
@@ -91,6 +101,7 @@ class Config:
             langchain_api_key=os.getenv('LANGCHAIN_API_KEY', ''),
             openai_api_key=os.getenv('OPENAI_API_KEY', ''),
             octav_api_key=os.getenv('OCTAV_API_KEY', ''),
+            defillama_api_key=os.getenv('DEFILLAMA_API_KEY'),
             nansen_api_key=os.getenv('NANSEN_API_KEY'),
             redis_url=os.getenv('REDIS_URL', 'redis://localhost:6379'),
             
@@ -109,7 +120,7 @@ class Config:
             octav_wait_for_sync=os.getenv('OCTAV_WAIT_FOR_SYNC', 'false').lower() == 'true',
             
             # Transaction API configuration
-            octav_transaction_limit=int(os.getenv('OCTAV_TRANSACTION_LIMIT', '100')),
+            octav_transaction_limit=int(os.getenv('OCTAV_TRANSACTION_LIMIT', '200')),
             octav_transaction_offset=int(os.getenv('OCTAV_TRANSACTION_OFFSET', '100')),
             octav_hide_spam=os.getenv('OCTAV_HIDE_SPAM', 'true').lower() == 'true',
             octav_transaction_sort=os.getenv('OCTAV_TRANSACTION_SORT', 'DESC'),

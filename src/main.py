@@ -86,6 +86,10 @@ class CryptoRecommendationCLI:
         if 'transactions' in wallet_data and wallet_data['transactions']:
             PortfolioFormatter.format_transactions(wallet_data['transactions'])
         
+        # Display DefiLlama protocol risk analysis if available
+        if 'protocol_risk_analysis' in wallet_data and wallet_data['protocol_risk_analysis']:
+            PortfolioFormatter.format_protocol_risk_analysis(wallet_data['protocol_risk_analysis'])
+        
         # Add risk score to the display
         risk_panel = Panel(
             f"[bold]Risk Assessment Score: {recommendation['risk_score']:.1f}/100[/bold]",
