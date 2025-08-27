@@ -244,26 +244,7 @@ def batch(file_path: str, mood: str):
         console.print(f"[red]❌ Error: {e}[/red]")
         sys.exit(1)
 
-@cli.command()
-def test():
-    """Test the system with a sample wallet"""
-    
-    test_wallet = "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb"
-    
-    console.print("[bold yellow]🧪 Running system test...[/bold yellow]\n")
-    
-    cli_app = CryptoRecommendationCLI()
-    
-    try:
-        results = cli_app.analyze_wallet(test_wallet, 'balanced')
-        
-        cli_app.display_results(results)
-        
-        console.print("\n[green]✅ System test completed successfully![/green]")
-    
-    except Exception as e:
-        console.print(f"[red]❌ System test failed: {e}[/red]")
-        sys.exit(1)
+
 
 if __name__ == "__main__":
     cli()

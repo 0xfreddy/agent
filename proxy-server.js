@@ -18,8 +18,6 @@ const OCTAV_BASE_URL = 'https://api.octav.fi';
 async function makeOctavRequest(endpoint, params = {}, method = 'GET') {
     try {
         const url = `${OCTAV_BASE_URL}${endpoint}`;
-        console.log(`Making ${method} request to: ${url}`);
-        console.log(`With params:`, params);
         
         const config = {
             method: method,
@@ -59,8 +57,6 @@ app.get('/api/portfolio', async (req, res) => {
         if (!addresses) {
             return res.status(400).json({ error: 'addresses parameter is required' });
         }
-
-        console.log(`Fetching portfolio for addresses: ${addresses}`);
         
         // Get parameters from request or use defaults
         const includeNFTs = req.query.includeNFTs || 'false';
@@ -96,8 +92,6 @@ app.get('/api/wallet', async (req, res) => {
         if (!addresses) {
             return res.status(400).json({ error: 'addresses parameter is required' });
         }
-
-        console.log(`Fetching wallet data for addresses: ${addresses}`);
         
         // Octav.fi API expects 'addresses' parameter as a comma-separated string
         const walletData = await makeOctavRequest('/v1/wallet', {
@@ -126,9 +120,6 @@ app.get('/health', (req, res) => {
 // Start server
 app.listen(PORT, () => {
     console.log(`🚀 Proxy server running on http://localhost:${PORT}`);
-    console.log(`📊 Portfolio endpoint: http://localhost:${PORT}/api/portfolio`);
-    console.log(`💳 Wallet endpoint: http://localhost:${PORT}/api/wallet`);
-    console.log(`🔑 Octav API Key: ${OCTAV_API_KEY ? '✅ Configured' : '❌ Missing'}`);
 });
 
 module.exports = app;
