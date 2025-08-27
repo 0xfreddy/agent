@@ -35,7 +35,7 @@ class Config:
     
     # Transaction API configuration
     octav_transaction_limit: int = 100
-    octav_transaction_offset: int = 0
+    octav_transaction_offset: int = 100
     octav_hide_spam: bool = True
     octav_transaction_sort: str = "DESC"
     octav_transaction_networks: str = ""
@@ -110,7 +110,7 @@ class Config:
             
             # Transaction API configuration
             octav_transaction_limit=int(os.getenv('OCTAV_TRANSACTION_LIMIT', '100')),
-            octav_transaction_offset=int(os.getenv('OCTAV_TRANSACTION_OFFSET', '0')),
+            octav_transaction_offset=int(os.getenv('OCTAV_TRANSACTION_OFFSET', '100')),
             octav_hide_spam=os.getenv('OCTAV_HIDE_SPAM', 'true').lower() == 'true',
             octav_transaction_sort=os.getenv('OCTAV_TRANSACTION_SORT', 'DESC'),
             octav_transaction_networks=os.getenv('OCTAV_TRANSACTION_NETWORKS', ''),

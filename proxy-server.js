@@ -117,16 +117,29 @@ app.get('/api/transactions', async (req, res) => {
             return res.status(400).json({ error: 'addresses parameter is required' });
         }
         
-        // Build parameters for the transactions endpoint
+        // Build parameters for the transactions endpoint according to tx.md specification
         const params = {
             addresses: addresses
         };
         
-        // Add optional parameters
+        // Add required parameters
+        if (req.query.limit) {
+            params.limit = parseInt(req.query.limit);
+        } else {
+            params.limit = 100;  // Default as per tx.md
+        }
+        
+        if (req.query.offset) {
+            params.offset = parseInt(req.query.offset);
+        } else {
+            params.offset = 0;  // Default as per tx.md
+        }
+        
+        // Add optional parameters as per tx.md specification
         const optionalParams = [
-            'limit', 'offset', 'initialSearchText', 'interactingAddresses',
-            'networks', 'txTypes', 'protocols', 'hideSpam', 'sort',
-            'tokenId', 'startDate', 'endDate'
+            'initialSearchText', 'interactingAddresses', 'networks', 
+            'txTypes', 'protocols', 'hideSpam', 'sort', 'tokenId', 
+            'startDate', 'endDate'
         ];
         
         optionalParams.forEach(param => {
@@ -134,11 +147,6 @@ app.get('/api/transactions', async (req, res) => {
                 params[param] = req.query[param];
             }
         });
-        
-        // Set default limit if not provided
-        if (!params.limit) {
-            params.limit = '100';
-        }
         
         // Set default sort if not provided
         if (!params.sort) {

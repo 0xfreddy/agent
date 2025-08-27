@@ -101,34 +101,65 @@ class OctavDataTool(BaseDataTool):
             
             # Get transaction data from proxy server using the new /v1/transactions endpoint
             self.logger.info(f"Fetching transaction data for {wallet_address}")
-            transaction_params = {
-                "addresses": wallet_address,
-                "limit": str(self.config.octav_transaction_limit),
-                "offset": str(self.config.octav_transaction_offset),
-                "sort": self.config.octav_transaction_sort
-            }
+            transactions = []
             
-            # Add optional transaction filters
-            if self.config.octav_hide_spam:
-                transaction_params["hideSpam"] = "true"
-            if self.config.octav_transaction_networks:
-                transaction_params["networks"] = self.config.octav_transaction_networks
-            if self.config.octav_transaction_types:
-                transaction_params["txTypes"] = self.config.octav_transaction_types
-            if self.config.octav_transaction_protocols:
-                transaction_params["protocols"] = self.config.octav_transaction_protocols
-            
-            transaction_response = requests.get(
-                f"http://localhost:3001/api/transactions",
-                headers=headers,
-                params=transaction_params,
-                timeout=self.config.request_timeout
-            )
-            transaction_response.raise_for_status()
-            transaction_data = transaction_response.json()
-            
-            # Parse the Octav API response structure
-            transactions = self._parse_octav_transactions_new(transaction_data)
+            try:
+                # Implement the exact format from tx.md specification
+                transaction_params = {
+                    "addresses": wallet_address,
+                    "limit": self.config.octav_transaction_limit,  # Integer, not string
+                    "offset": self.config.octav_transaction_offset,  # Integer, not string
+                    "sort": self.config.octav_transaction_sort
+                }
+                
+                # Add optional transaction filters as per tx.md specification
+                if self.config.octav_hide_spam:
+                    transaction_params["hideSpam"] = "true"
+                if self.config.octav_transaction_networks:
+                    transaction_params["networks"] = self.config.octav_transaction_networks
+                if self.config.octav_transaction_types:
+                    transaction_params["txTypes"] = self.config.octav_transaction_types
+                if self.config.octav_transaction_protocols:
+                    transaction_params["protocols"] = self.config.octav_transaction_protocols
+                
+                self.logger.info(f"Making request to /v1/transactions with params: {transaction_params}")
+                
+                transaction_response = requests.get(
+                    f"http://localhost:3001/api/transactions",
+                    headers=headers,
+                    params=transaction_params,
+                    timeout=self.config.request_timeout
+                )
+                transaction_response.raise_for_status()
+                transaction_data = transaction_response.json()
+                
+                # Parse the Octav API response structure
+                transactions = self._parse_octav_transactions_new(transaction_data)
+                self.logger.info(f"Successfully fetched {len(transactions)} transactions using new endpoint")
+                
+            except Exception as e:
+                self.logger.warning(f"New transactions endpoint failed: {e}")
+                self.logger.info("Falling back to legacy /v1/wallet endpoint")
+                
+                # Fallback to legacy wallet endpoint
+                try:
+                    wallet_response = requests.get(
+                        f"http://localhost:3001/api/wallet",
+                        headers=headers,
+                        params={"addresses": wallet_address},
+                        timeout=self.config.request_timeout
+                    )
+                    wallet_response.raise_for_status()
+                    wallet_data = wallet_response.json()
+                    
+                    # Parse the legacy response structure
+                    transactions = self._parse_octav_transactions(wallet_data)
+                    self.logger.info(f"Successfully fetched {len(transactions)} transactions using legacy endpoint")
+                    
+                except Exception as fallback_error:
+                    self.logger.error(f"Both transaction endpoints failed: {fallback_error}")
+                    # Return empty transactions list if both fail
+                    transactions = []
             balances = self._parse_octav_portfolio(portfolio_data)
             
             # Extract portfolio metrics if available
